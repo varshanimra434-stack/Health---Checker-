@@ -1,0 +1,137 @@
+import io
+import os
+import re
+
+import streamlit as st
+from gtts import gTTS
+from google import genai
+from google.genai import types
+
+
+MODEL_NAME = "gemini-2.0-flash"
+
+
+def get_gemini_api_key() -> str | None:
+    """Read the key from Streamlit secrets first, then from the environment."""
+    try:
+        secret_key = st.secrets.get("GEMINI_API_KEY")
+    except FileNotFoundError:
+        secret_key = None
+
+    return secret_key or os.getenv("GEMINI_API_KEY")
+
+
+def parse_result(raw_text: str) -> tuple[str, str]:
+    """Extract the model's rating and explanation from its requested format."""
+    text = (raw_text or "").strip()
+    # Models sometimes wrap labels in Markdown, such as **RATING:** SAFE.
+    clean_text = re.sub(r"[*_`]", "", text)
+
+    rating_match = re.search(
+        r"\bRATING\s*:\s*(SAFE|HARMFUL|UNCERTAIN)\b",
+        clean_text,
+        flags=re.IGNORECASE,
+    )
+    rating = rating_match.group(1).upper() if rating_match else "UNCERTAIN"
+
+    explanation_match = re.search(
+        r"\bEXPLANATION\s*:\s*(.*)",
+        clean_text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    explanation = explanation_match.group(1).strip() if explanation_match else clean_text
+    explanation = explanation.strip(" -:\n")
+
+    if not explanation:
+        explanation = (
+            "Ingredients ki photo se reliable analysis nahi ho paaya. "
+            "Label ko clearly dikhakar dobara photo lein."
+        )
+
+    return rating, explanation
+
+
+def analyze_product(client: genai.Client, image_bytes: bytes) -> tuple[str, str]:
+    prompt = """
+Aap food, cosmetic, ya medicine label ko sirf image mein dikh rahe text ke
+ आधार par screen karne wale assistant hain. Ingredients aur warnings ko
+ ध्यान से पढ़ें; jo text साफ़ दिखाई nahi de raha uska अनुमान na lagayen.
+
+Bilkul is format mein jawab dein:
+RATING: SAFE
+EXPLANATION: Hindi mein 1-2 simple lines.
+
+RATING ke liye sirf SAFE, HARMFUL, ya UNCERTAIN use karein:
+- SAFE: visible ingredients mein koi obvious concern nahi mila, lekin ise
+  medical guarantee na batayen.
+- HARMFUL: visible label par koi clearly concerning ingredient, warning, ya
+  allergy risk dikh raha hai.
+- UNCERTAIN: label/ingredients readable nahi hain, product identify nahi hua,
+  ya photo ke basis par safe conclusion nahi nikala ja sakta.
+
+Hamesha सीमाएँ बताएं: yeh general information hai, diagnosis ya medical
+advice nahi. Agar label unreadable ho to RATING: UNCERTAIN dein.
+"""
+
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=[prompt, image_part],
+    )
+    return parse_result(response.text)
+
+
+def make_hindi_audio(text: str) -> bytes:
+    audio_buffer = io.BytesIO()
+    gTTS(text=text, lang="hi").write_to_fp(audio_buffer)
+    return audio_buffer.getvalue()
+
+
+st.set_page_config(page_title="Auto Product Health Checker", page_icon="🧴")
+st.title("Auto Product Health Checker")
+st.caption("Product label ka general, image-based screening — medical advice nahi.")
+
+api_key = get_gemini_api_key()
+if not api_key:
+    st.error(
+        "GEMINI_API_KEY set nahi hai. Local run ke liye environment variable set karein "
+        "ya Streamlit secrets mein GEMINI_API_KEY add karein."
+    )
+    st.stop()
+
+client = genai.Client(api_key=api_key)
+img_input = st.camera_input("Product ka ingredients label camera ke saamne rakhein")
+
+if img_input is not None:
+    image_bytes = img_input.getvalue()
+
+    try:
+        with st.spinner("Ingredients aur warnings analyze ho rahe hain..."):
+            rating, explanation = analyze_product(client, image_bytes)
+    except Exception:
+        st.error(
+            "Image analysis fail ho gaya. API key, internet connection, aur "
+            "Gemini model access check karke dobara try karein."
+        )
+        st.stop()
+
+    if rating == "HARMFUL":
+        st.error(f"Rating: {rating}")
+    elif rating == "SAFE":
+        st.success(f"Rating: {rating}")
+    else:
+        st.warning(f"Rating: {rating}")
+
+    st.write(explanation)
+    st.info(
+        "Important: photo-based result final medical or allergy advice nahi hai. "
+        "Severe allergy, pregnancy, ya health condition mein product label aur "
+        "health professional ki advice follow karein."
+    )
+
+    try:
+        with st.spinner("Hindi voice taiyar ho rahi hai..."):
+            audio_bytes = make_hindi_audio(f"Rating: {rating}. {explanation}")
+        st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+    except Exception:
+        st.caption("Voice output available nahi ho paaya; text result upar diya gaya hai.")
