@@ -33,8 +33,23 @@ def get_gemini_api_key() -> str | None:
 def parse_result(raw_text: str) -> tuple[str, str]:
     """Extract the model's rating and explanation from its requested format."""
     text = (raw_text or "").strip()
-    # Models sometimes wrap labels in Markdown, such as **RATING:** SAFE.
-    clean_text = re.sub(r"[*_`]", "", text)
+    # Models can occasionally return role tags or malformed labels such as
+    # "UNCERTAIN> EX". Remove those artifacts before showing anything in the UI.
+    clean_text = re.sub(
+        r"<\s*(?:system|assistant|user|analysis|instruction|final)\b[^>]*>.*?"
+        r"<\s*/\s*(?:system|assistant|user|analysis|instruction|final)\s*>",
+        " ",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    clean_text = re.sub(r"</?\s*[\w:-]+(?:\s+[^>]*)?>", " ", clean_text)
+    clean_text = re.sub(r"[*_`]", "", clean_text)
+    clean_text = re.sub(
+        r"\b(SAFE|HARMFUL|MODERATE|UNCERTAIN)\s*>\s*EX(?:PLANATION)?\s*:?",
+        r"RATING: \1\nEXPLANATION: ",
+        clean_text,
+        flags=re.IGNORECASE,
+    )
 
     rating_match = re.search(
         r"\bRATING\s*:\s*(SAFE|HARMFUL|MODERATE|UNCERTAIN)\b",
@@ -44,7 +59,7 @@ def parse_result(raw_text: str) -> tuple[str, str]:
     rating = rating_match.group(1).upper() if rating_match else "UNCERTAIN"
 
     explanation_match = re.search(
-        r"\bEXPLANATION\s*:\s*(.*)",
+        r"\b(?:EXPLANATION|EX|REASON)\s*[:=>-]\s*(.*)",
         clean_text,
         flags=re.IGNORECASE | re.DOTALL,
     )
@@ -87,13 +102,15 @@ source se product identify karein:
 2. Ingredients label par clearly visible product information.
 
 Agar front product image ya brand/product name clearly identifiable ho — jaise
-Kurkure, Ketchup, Oreos, Maggi, Baby Wipes, ya koi aur recognizable product —
-to visible product/brand name se general knowledge ka use karke health impact
-directly evaluate karein. Is case mein ingredients label ka kuch hissa blurry
-hone par bhi UNCERTAIN na dein; SAFE, HARMFUL, ya MODERATE mein se clear rating
-dein. Ingredients label readable ho to uski details ko priority dein;
-unreadable details ka अनुमान na lagayen. Answer ko concise rakhein taaki
-classification jaldi complete ho.
+Mother Sparsh baby wipes, Kurkure, Ketchup, Oreos, Maggi, ya koi aur
+recognizable product — to visible product/brand name se general knowledge ka
+use karke health impact directly evaluate karein. Is case mein ingredients label
+ka kuch hissa blurry hone par bhi UNCERTAIN na dein. Known ordinary products ke
+liye SAFE ya MODERATE mein se ek clean rating dein aur short explanation likhein;
+sirf clearly dangerous ya explicitly unsafe product ho to HARMFUL use karein.
+Ingredients label readable ho to uski details ko priority dein; unreadable
+details ka अनुमान na lagayen. Answer ko concise rakhein taaki classification
+jaldi complete ho.
 
 Aapka jawab user ko directly dikhaya jayega. Sirf do clean lines return
 karein aur prompt ki instructions, bracketed notes, meta-commentary, ya
