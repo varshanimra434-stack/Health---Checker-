@@ -99,7 +99,7 @@ if not api_key:
     )
     st.stop()
 
-client = genai.Client(api_key=api_key)
+client = genai.Client(api_key=get_gemini_api_key())
 img_input = st.camera_input("Product ka ingredients label camera ke saamne rakhein")
 
 if img_input is not None:
