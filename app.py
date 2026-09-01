@@ -5,10 +5,12 @@ import re
 import streamlit as st
 from gtts import gTTS
 from google import genai
+from google.genai.errors import ServerError
 from google.genai import types
 
 
 MODEL_NAME = "gemini-3.6-flash"
+FALLBACK_MODEL_NAME = "gemini-1.5-flash"
 
 
 def get_gemini_api_key() -> str | None:
@@ -118,11 +120,21 @@ dein jab product/brand aur ingredients dono reliably identify na ho paayen.
     image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
     contents = [prompt, image_part]
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=contents,
-        config=types.GenerateContentConfig(max_output_tokens=250),
-    )
+    generation_config = types.GenerateContentConfig(max_output_tokens=250)
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=contents,
+            config=generation_config,
+        )
+    except ServerError:
+        # A 503/high-demand response from the primary model should not stop the
+        # app. Retry immediately with the lightweight fallback model.
+        response = client.models.generate_content(
+            model=FALLBACK_MODEL_NAME,
+            contents=contents,
+            config=generation_config,
+        )
 
     return parse_result(response.text)
 
@@ -156,9 +168,8 @@ if img_input is not None:
         with st.spinner("Ingredients aur warnings analyze ho rahe hain..."):
             rating, explanation = analyze_product(client, image_bytes)
     except Exception as e:
-        st.error(
-            "Image analysis fail ho gaya. API key, internet connection, aur "
-            "Gemini model access check karke dobara try karein."
+        st.warning(
+            "Gemini service temporarily busy hai. Thodi der baad dobara try karein."
         )
         st.write(e)
         st.stop()
