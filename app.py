@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 
 
-MODEL_NAME = "gemini-3.6-flash"
+MODEL_NAME = "gemini-1.5-flash"
 
 
 def get_gemini_api_key() -> str | None:
@@ -62,17 +62,18 @@ def analyze_product(client: genai.Client, image_bytes: bytes) -> tuple[str, str]
     prompt = """
 Aap food, cosmetic, ya medicine product ko image se identify karke uske
 ingredients aur health impact ka general screening karne wale assistant hain.
-Product ko do sources mein se kisi ek se identify karein:
-1. Packet ke front par clearly visible brand ya product name.
+Photo ki poori front image/packaging ko pehle inspect karein. Product ko do
+sources mein se kisi ek se identify karein:
+1. Packet ke front image par clearly visible brand ya product name.
 2. Ingredients label par clearly visible product information.
 
-Agar brand/product name clearly identifiable ho — jaise Kurkure, Maggi, Oreos,
-Baby Wipes, ya koi aur recognizable product — to general knowledge ka use karke
-uske typical ingredients aur health impact evaluate karein. Sirf is wajah se
-UNCERTAIN na dein ki ingredients label ka kuch hissa blurry hai. Agar product
-name/brand clearly dikh raha ho, to SAFE, HARMFUL, ya MODERATE mein se clear
-rating dein. Ingredients label readable ho to uski details ko priority dein;
-unreadable details ka अनुमान na lagayen.
+Agar front image par brand/product name clearly identifiable ho — jaise Kurkure,
+Maggi, Oreos, Baby Wipes, ya koi aur recognizable product — to general
+knowledge ka use karke uske typical ingredients aur health impact evaluate
+karein. Sirf is wajah se UNCERTAIN na dein ki ingredients label ka kuch hissa
+blurry hai. Agar product name/brand clearly dikh raha ho, to SAFE, HARMFUL, ya
+MODERATE mein se clear rating dein. Ingredients label readable ho to uski
+details ko priority dein; unreadable details ka अनुमान na lagayen.
 
 Bilkul is format mein jawab dein:
 RATING: SAFE
