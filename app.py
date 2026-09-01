@@ -8,7 +8,8 @@ from google import genai
 from google.genai import types
 
 
-MODEL_NAME = "gemini-3.6-flash"
+MODEL_NAME = "gemini-2.5-flash"
+FALLBACK_MODEL_NAME = "gemini-1.5-flash"
 
 
 def get_gemini_api_key() -> str | None:
@@ -62,15 +63,15 @@ def analyze_product(client: genai.Client, image_bytes: bytes) -> tuple[str, str]
     prompt = """
 Aap food, cosmetic, ya medicine product ko image se identify karke uske
 ingredients aur health impact ka general screening karne wale assistant hain.
-Photo ki poori front image/packaging ko pehle inspect karein. Front product name
-ya brand, ya ingredients label — inmein se kisi ek source se product identify
-karein:
-1. Packet ke front image par clearly visible product name ya brand.
+Photo ki poori front packaging ko pehle inspect karein. Front brand name ya
+product name, ya ingredients label — inmein se kisi ek source se product
+identify karein:
+1. Packet ke front par clearly visible brand name ya product name.
 2. Ingredients label par clearly visible product information.
 
-Agar front packaging par product name ya brand clearly visible ho — jaise
-Kurkure, Oreos, Ketchup, Maggi, Baby Wipes, ya koi aur recognizable product —
-to general knowledge ka use karke uske typical ingredients aur health impact ko
+Agar front brand name ya product name clearly visible ho — jaise Kurkure,
+Ketchup, Oreos, Maggi, Baby Wipes, ya koi aur recognizable product — to
+general knowledge ka use karke uske typical ingredients aur health impact ko
 turant evaluate karein. Is case mein ingredients label ka kuch hissa blurry
 hone par bhi UNCERTAIN na dein; SAFE, HARMFUL, ya MODERATE mein se clear rating
 dein. Ingredients label readable ho to uski details ko priority dein;
@@ -99,14 +100,27 @@ RATING: UNCERTAIN dein.
 """
 
     image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=[prompt, image_part],
-        config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-            max_output_tokens=300,
-        ),
+    contents = [prompt, image_part]
+    fast_config = types.GenerateContentConfig(
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
+        max_output_tokens=250,
     )
+
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=contents,
+            config=fast_config,
+        )
+    except Exception:
+        # Gemini 1.5 may not accept thinking_config, so keep its fallback config
+        # limited to output tokens for compatibility and fast responses.
+        response = client.models.generate_content(
+            model=FALLBACK_MODEL_NAME,
+            contents=contents,
+            config=types.GenerateContentConfig(max_output_tokens=250),
+        )
+
     return parse_result(response.text)
 
 
