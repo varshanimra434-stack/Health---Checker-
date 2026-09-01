@@ -70,11 +70,11 @@ karein:
 
 Agar front par product name ya brand clearly visible ho — jaise Kurkure, Maggi,
 Oreos, Baby Wipes, ya koi aur recognizable product — to general knowledge ka
-use karke uske typical ingredients aur health impact evaluate karein. Is case
-mein ingredients label ka kuch hissa blurry hone par bhi UNCERTAIN na dein;
-SAFE, HARMFUL, ya MODERATE mein se clear rating dein. Ingredients label
+use karke uske typical ingredients aur health impact ko turant evaluate karein.
+Is case mein ingredients label ka kuch hissa blurry hone par bhi UNCERTAIN na
+dein; SAFE, HARMFUL, ya MODERATE mein se clear rating dein. Ingredients label
 readable ho to uski details ko priority dein; unreadable details ka अनुमान na
-lagayen.
+lagayen. Answer ko concise rakhein taaki classification jaldi complete ho.
 
 Bilkul is format mein jawab dein:
 RATING: SAFE
@@ -101,6 +101,10 @@ RATING: UNCERTAIN dein.
     response = client.models.generate_content(
         model=MODEL_NAME,
         contents=[prompt, image_part],
+        config=types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            max_output_tokens=300,
+        ),
     )
     return parse_result(response.text)
 
