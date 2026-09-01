@@ -35,7 +35,7 @@ def parse_result(raw_text: str) -> tuple[str, str]:
     clean_text = re.sub(r"[*_`]", "", text)
 
     rating_match = re.search(
-        r"\bRATING\s*:\s*(SAFE|HARMFUL|UNCERTAIN)\b",
+        r"\bRATING\s*:\s*(SAFE|HARMFUL|MODERATE|UNCERTAIN)\b",
         clean_text,
         flags=re.IGNORECASE,
     )
@@ -60,24 +60,39 @@ def parse_result(raw_text: str) -> tuple[str, str]:
 
 def analyze_product(client: genai.Client, image_bytes: bytes) -> tuple[str, str]:
     prompt = """
-Aap food, cosmetic, ya medicine label ko sirf image mein dikh rahe text ke
- आधार par screen karne wale assistant hain. Ingredients aur warnings ko
- ध्यान से पढ़ें; jo text साफ़ दिखाई nahi de raha uska अनुमान na lagayen.
+Aap food, cosmetic, ya medicine product ko image se identify karke uske
+ingredients aur health impact ka general screening karne wale assistant hain.
+Product ko do sources mein se kisi ek se identify karein:
+1. Packet ke front par clearly visible brand ya product name.
+2. Ingredients label par clearly visible product information.
+
+Agar brand/product name clearly identifiable ho — jaise Kurkure, Maggi, Oreos,
+Baby Wipes, ya koi aur recognizable product — to general knowledge ka use karke
+uske typical ingredients aur health impact evaluate karein. Sirf is wajah se
+UNCERTAIN na dein ki ingredients label ka kuch hissa blurry hai. Agar product
+name/brand clearly dikh raha ho, to SAFE, HARMFUL, ya MODERATE mein se clear
+rating dein. Ingredients label readable ho to uski details ko priority dein;
+unreadable details ka अनुमान na lagayen.
 
 Bilkul is format mein jawab dein:
 RATING: SAFE
 EXPLANATION: Hindi mein 1-2 simple lines.
 
-RATING ke liye sirf SAFE, HARMFUL, ya UNCERTAIN use karein:
+RATING ke liye sirf SAFE, HARMFUL, MODERATE, ya UNCERTAIN use karein:
 - SAFE: visible ingredients mein koi obvious concern nahi mila, lekin ise
   medical guarantee na batayen.
 - HARMFUL: visible label par koi clearly concerning ingredient, warning, ya
   allergy risk dikh raha hai.
+- MODERATE: product generally harmful nahi hai, lekin sugar, salt, fat,
+  additives, fragrance, ya regular use/consumption se related health concern
+  ho sakta hai.
 - UNCERTAIN: label/ingredients readable nahi hain, product identify nahi hua,
-  ya photo ke basis par safe conclusion nahi nikala ja sakta.
+  aur front par brand/product name bhi clearly identifiable nahi hai.
 
 Hamesha सीमाएँ बताएं: yeh general information hai, diagnosis ya medical
-advice nahi. Agar label unreadable ho to RATING: UNCERTAIN dein.
+advice nahi. Product clearly identify ho jaane par ingredient details ke liye
+general product knowledge use karein; dono sources se product identify na ho to
+RATING: UNCERTAIN dein.
 """
 
     image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
