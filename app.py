@@ -8,8 +8,7 @@ from google import genai
 from google.genai import types
 
 
-MODEL_NAME = "gemini-2.5-flash"
-FALLBACK_MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-3.6-flash"
 
 
 def get_gemini_api_key() -> str | None:
@@ -63,15 +62,15 @@ def analyze_product(client: genai.Client, image_bytes: bytes) -> tuple[str, str]
     prompt = """
 Aap food, cosmetic, ya medicine product ko image se identify karke uske
 ingredients aur health impact ka general screening karne wale assistant hain.
-Photo ki poori front packaging ko pehle inspect karein. Front brand name ya
-product name, ya ingredients label — inmein se kisi ek source se product
-identify karein:
+Photo ki poori front image/packaging ko pehle inspect karein. Front product image
+ya clearly visible brand/product name, ya ingredients label — inmein se kisi ek
+source se product identify karein:
 1. Packet ke front par clearly visible brand name ya product name.
 2. Ingredients label par clearly visible product information.
 
-Agar front brand name ya product name clearly visible ho — jaise Kurkure,
-Ketchup, Oreos, Maggi, Baby Wipes, ya koi aur recognizable product — to
-visible product/brand name se general knowledge ka use karke health impact ko
+Agar front product image ya brand/product name clearly identifiable ho — jaise
+Kurkure, Ketchup, Oreos, Maggi, Baby Wipes, ya koi aur recognizable product —
+to visible product/brand name se general knowledge ka use karke health impact
 directly evaluate karein. Is case mein ingredients label ka kuch hissa blurry
 hone par bhi UNCERTAIN na dein; SAFE, HARMFUL, ya MODERATE mein se clear rating
 dein. Ingredients label readable ho to uski details ko priority dein;
@@ -102,20 +101,11 @@ RATING: UNCERTAIN dein.
     image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
     contents = [prompt, image_part]
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=types.GenerateContentConfig(max_output_tokens=250),
-        )
-    except Exception:
-        # Retry the same verified model once if the first request is transiently
-        # unavailable.
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=types.GenerateContentConfig(max_output_tokens=250),
-        )
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=contents,
+        config=types.GenerateContentConfig(max_output_tokens=250),
+    )
 
     return parse_result(response.text)
 
