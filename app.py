@@ -14,11 +14,18 @@ MODEL_NAME = "gemini-2.0-flash"
 def get_gemini_api_key() -> str | None:
     """Read the key from Streamlit secrets first, then from the environment."""
     try:
-        secret_key = st.secrets.get("GEMINI_API_KEY")
+        gemini_key = st.secrets.get("GEMINI_API_KEY")
+        google_key = st.secrets.get("GOOGLE_API_KEY")
     except FileNotFoundError:
-        secret_key = None
+        gemini_key = None
+        google_key = None
 
-    return secret_key or os.getenv("GEMINI_API_KEY")
+    return (
+        gemini_key
+        or google_key
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
+    )
 
 
 def parse_result(raw_text: str) -> tuple[str, str]:
@@ -94,8 +101,9 @@ st.caption("Product label ka general, image-based screening — medical advice n
 api_key = get_gemini_api_key()
 if not api_key:
     st.error(
-        "GEMINI_API_KEY set nahi hai. Local run ke liye environment variable set karein "
-        "ya Streamlit secrets mein GEMINI_API_KEY add karein."
+        "GEMINI_API_KEY ya GOOGLE_API_KEY set nahi hai. Local run ke liye "
+        "environment variable set karein ya Streamlit secrets mein inmein se "
+        "koi ek add karein."
     )
     st.stop()
 
@@ -108,11 +116,12 @@ if img_input is not None:
     try:
         with st.spinner("Ingredients aur warnings analyze ho rahe hain..."):
             rating, explanation = analyze_product(client, image_bytes)
-    except Exception:
+    except Exception as e:
         st.error(
             "Image analysis fail ho gaya. API key, internet connection, aur "
             "Gemini model access check karke dobara try karein."
         )
+        st.write(e)
         st.stop()
 
     if rating == "HARMFUL":
