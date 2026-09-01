@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 
 
-MODEL_NAME = "gemini-2.0-flash"
+MODEL_NAME = "gemini-3.6-flash"
 
 
 def get_gemini_api_key() -> str | None:
