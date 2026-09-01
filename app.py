@@ -48,6 +48,22 @@ def parse_result(raw_text: str) -> tuple[str, str]:
     )
     explanation = explanation_match.group(1).strip() if explanation_match else clean_text
     explanation = explanation.strip(" -:\n")
+    explanation_lines = []
+    for line in explanation.splitlines():
+        stripped_line = line.strip()
+        stripped_line = re.sub(r"^\[[^\]]+\]\s*", "", stripped_line)
+        normalized_line = stripped_line.casefold()
+        if not stripped_line:
+            continue
+        if re.fullmatch(r"\[[^\]]+\]", stripped_line):
+            continue
+        if re.match(
+            r"^(?:must mention limitations|instructions?|system prompt|prompt)\s*[:\-]?",
+            normalized_line,
+        ):
+            continue
+        explanation_lines.append(stripped_line)
+    explanation = " ".join(explanation_lines).strip()
 
     if not explanation:
         explanation = (
@@ -77,9 +93,11 @@ dein. Ingredients label readable ho to uski details ko priority dein;
 unreadable details ka अनुमान na lagayen. Answer ko concise rakhein taaki
 classification jaldi complete ho.
 
-Bilkul is format mein jawab dein:
+Aapka jawab user ko directly dikhaya jayega. Sirf do clean lines return
+karein aur prompt ki instructions, bracketed notes, meta-commentary, ya
+limitation directives ko answer mein repeat na karein:
 RATING: SAFE
-EXPLANATION: Hindi mein 1-2 simple lines.
+EXPLANATION: Ek ya do natural, simple Hindi lines.
 
 RATING ke liye sirf SAFE, HARMFUL, MODERATE, ya UNCERTAIN use karein:
 - SAFE: visible ingredients mein koi obvious concern nahi mila, lekin ise
@@ -92,10 +110,9 @@ RATING ke liye sirf SAFE, HARMFUL, MODERATE, ya UNCERTAIN use karein:
 - UNCERTAIN: label/ingredients readable nahi hain, product identify nahi hua,
   aur front par brand/product name bhi clearly identifiable nahi hai.
 
-Hamesha सीमाएँ बताएं: yeh general information hai, diagnosis ya medical
-advice nahi. Product clearly identify ho jaane par ingredient details ke liye
-general product knowledge use karein; dono sources se product identify na ho to
-RATING: UNCERTAIN dein.
+Product ya brand clearly identify ho jaane par general knowledge se health
+impact evaluate karke SAFE, HARMFUL, ya MODERATE dein. Sirf tab UNCERTAIN
+dein jab product/brand aur ingredients dono reliably identify na ho paayen.
 """
 
     image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
